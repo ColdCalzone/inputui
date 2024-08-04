@@ -1,0 +1,9 @@
+[package]
+name = "inputui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+inputbot = "0.6.0"
+ratatui = "0.27.0"
+
