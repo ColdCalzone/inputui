@@ -1,62 +1,97 @@
 use inputbot::{KeybdKey, KeybdKey::*, MouseButton::*};
-use std::io::{stdout, Result};
 use std::iter;
+use std::sync::Arc;
 use ratatui::{
-    backend::CrosstermBackend,
-    crossterm::{
-        event::{self, KeyCode, KeyEventKind},
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-        ExecutableCommand,
-    },
     style::Stylize,
-    widgets::{Widget, Paragraph, Padding, Block},
-    Terminal,
+    widgets::{Widget, Paragraph, Padding, Block, BorderType},
     layout::{
         Rect,
         Layout,
         Flex,
-        Constraint::{self, Fill, Max},
-        Alignment,
+        Constraint::{Max, Fill},
     },
     buffer::Buffer,
     style::Style,
 };
 
-pub struct RenderedKey(KeybdKey);
+#[derive(PartialEq)]
+pub enum KeyObj {
+    Blank,
+    RenderedKey {
+      key: Arc<KeybdKey>,
+    },
+    Break,
+    Fill,
+}
 
-impl RenderedKey {
-    pub fn new(letter: char) -> Self {
-        RenderedKey(inputbot::get_keybd_key(letter).expect("Invalid key"))
+impl KeyObj {
+    pub fn from_char(letter: char) -> Self {
+        KeyObj::RenderedKey {
+            key: inputbot::get_keybd_key(letter).expect("Invalid key").into(),
+        }
     }
 
-    pub fn get_paragraph(&self) -> Paragraph {
-        Paragraph::new(String::from(inputbot::from_keybd_key(self.0).expect("Invalid key").to_ascii_uppercase()))
+    pub fn from_key(key: KeybdKey) -> Self {
+        KeyObj::RenderedKey {
+            key: key.into(),
+        }
+    }
+
+    pub fn get_paragraph(&self) -> Option<Paragraph> {
+        match self {
+            KeyObj::RenderedKey { key } => Some(Paragraph::new(String::from(match **key {
+                SpaceKey => ' ',
+                _        => inputbot::from_keybd_key(**key).expect("Invalid key").to_ascii_uppercase(),
+            }))
             .centered()
-            .block(Block::new().padding(Padding::vertical(1)))
+            .block(Block::bordered().border_type(BorderType::Rounded))),
+
+            _                           => None,
+        }
     }
 }
 
 
-pub fn render(area: Rect, keys_to_render : &[RenderedKey], buf: &mut Buffer) {
-    let keys_chunks = keys_to_render.chunks((area.width / 10) as usize);
-    let verticals = Layout::vertical(iter::repeat(Max(3)).take(keys_chunks.len())).flex(Flex::SpaceAround).split(area);
-    let verticals_keys = verticals.into_iter().zip(keys_chunks);
+pub fn render(area: Rect, keys_to_render : &[KeyObj], buf: &mut Buffer) {
+    let keys_chunks : Vec<&[KeyObj]> = keys_to_render.split(|k_obj| k_obj == &KeyObj::Break).flat_map(|keys| keys.chunks((area.width / 10) as usize)).collect();
+    let verticals = Layout::vertical(iter::repeat(Max(3)).take(keys_chunks.len())).flex(Flex::SpaceBetween).split(area);
+    let verticals_keys = verticals.into_iter().zip(&keys_chunks);
 
     for (v_area, keys) in verticals_keys {
-        let horizontals = Layout::horizontal(iter::repeat(Max(9)).take(keys.len())).flex(Flex::SpaceAround).split(*v_area);
+        let horizontals = Layout::horizontal((keys.iter().map(|x| 
+            match x {
+                KeyObj::RenderedKey { key } => {
+                    match *(key.clone()) {
+                        SpaceKey => Max(48),
+                        _        => Max(9),
+                    }
+                },
 
+                KeyObj::Blank => {
+                    Max(9)
+                },
+
+                KeyObj::Fill | KeyObj::Break => {
+                    Fill(1)
+                }
+            })).take(keys.len())).horizontal_margin(2).flex(Flex::SpaceAround).split(*v_area);
         keys.iter().zip(horizontals.iter()).for_each(|(r_key, area)| {
-            let key = r_key.get_paragraph();
+            if let KeyObj::Blank = r_key {
+                return;
+            }
+            else if let Some(key_p) = r_key.get_paragraph() {
+        
+                let mut style = Style::new().white();
+                if let KeyObj::RenderedKey { key } = r_key {
+                    style = if key.is_pressed() {
+                        style.on_red()
+                    } else {
+                        style.on_blue()
+                    };
+                }
 
-            let mut style = Style::new().white();
-            style = if false {
-                style.on_red()
-            } else {
-                style.on_blue()
-            };
-
-
-            key.style(style).render(*area, buf);
+                key_p.style(style).render(*area, buf);
+            }
         });
     }
 }
