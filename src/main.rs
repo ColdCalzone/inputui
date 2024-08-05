@@ -64,12 +64,12 @@ fn main() -> Result<()> {
                 let area = frame.size();
 
                 let layout = Layout::vertical([
-                    Percentage(100),
-                    // Percentage(30),
-                ]).split(area);
+                    Percentage(50),
+                    Percentage(50),
+                ]).spacing(1).split(area);
                 
                 key_display::render(layout[0], &KEYS, frame.buffer_mut());
-                // mouse_display::render(layout[1], frame.buffer_mut());
+                mouse_display::render(layout[1], frame.buffer_mut());
             })?;
 
             // Input events
