@@ -21,20 +21,22 @@ use inputbot::{KeybdKey, MouseButton};
 pub mod key_display;
 pub mod mouse_display;
 
-use key_display::KeyObj;
+use key_display::{KeyboardDisplay, KeyObj};
 
 fn main() -> Result<()> {
-    let mut KEYS : Vec<KeyObj> = vec![
+    let mut keyboard : KeyboardDisplay = KeyboardDisplay::fromKeyObjs(vec![
         KeyObj::Blank,
         KeyObj::from_char('W'),
+        KeyObj::from_char('E'),
         KeyObj::from_char('R'),
         KeyObj::Break,
         KeyObj::from_char('A'),
         KeyObj::from_char('S'),
         KeyObj::from_char('D'),
+        KeyObj::Blank,
         KeyObj::Break,
         KeyObj::from_key(KeybdKey::SpaceKey),
-    ];
+    ]);
 
     // let mut keys_pressed = KEYS.iter().map(|x| x.0).zip(iter::repeat(false)).collect::<HashMap<KeybdKey, bool>>();
 
@@ -43,8 +45,8 @@ fn main() -> Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     terminal.clear()?;
 
-    for i in 0..KEYS.len() {
-        match &KEYS[i] {
+    for i in 0..keyboard.keys_to_render.len() {
+        match &keyboard.keys_to_render[i] {
             KeyObj::RenderedKey { key } => {
                 let key_ = key.clone();  
                 key_.bind(move || {
@@ -68,7 +70,7 @@ fn main() -> Result<()> {
                     Percentage(50),
                 ]).spacing(1).split(area);
                 
-                key_display::render(layout[0], &KEYS, frame.buffer_mut());
+                frame.render_widget(&keyboard, layout[0]);
                 mouse_display::render(layout[1], frame.buffer_mut());
             })?;
 
